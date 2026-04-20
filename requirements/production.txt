@@ -1,0 +1,5 @@
+-r base.txt
+
+sentry-sdk==1.*
+django-storages==1.*
+boto3==1.*
