@@ -124,6 +124,24 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# Explicitly import the top-level tasks/ package (not inside any Django app).
+CELERY_IMPORTS = [
+    "tasks.report_tasks",
+    "tasks.export_tasks",
+    "tasks.invitation_tasks",
+]
+
+# Beat schedule
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Generate daily analytics reports for all published surveys at 02:00 UTC.
+    "generate-daily-reports": {
+        "task": "tasks.report_tasks.generate_daily_reports",
+        "schedule": crontab(hour=2, minute=0),
+    },
+}
+
 # DRF
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

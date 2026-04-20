@@ -4,6 +4,7 @@ from datetime import date
 from celery import shared_task
 from django.core.cache import cache
 
+from apps.surveys.models import Survey
 from services import analytics_service
 
 # TTL for task result metadata stored in Redis (24 hours)
@@ -58,3 +59,23 @@ def generate_survey_report(self, survey_id: str, format: str = "json", report_da
         meta = {"status": "failure", "result": {"error": str(exc)}}
         cache.set(_task_meta_key(task_id), meta, TASK_RESULT_TTL)
         raise
+
+
+@shared_task
+def generate_daily_reports():
+    """
+    Periodic beat task: enqueue a generate_survey_report for every published survey.
+    Runs daily (configured in CELERY_BEAT_SCHEDULE). Each survey report is queued
+    as an independent subtask so failures are isolated.
+    """
+    survey_ids = (
+        Survey.objects
+        .filter(status=Survey.Status.PUBLISHED)
+        .values_list("id", flat=True)
+    )
+    report_date = str(date.today())
+    queued = 0
+    for survey_id in survey_ids:
+        generate_survey_report.delay(str(survey_id), format="json", report_date=report_date)
+        queued += 1
+    return {"queued": queued, "report_date": report_date}
