@@ -38,7 +38,7 @@ services:
   init:
     build: .
     <<: *app-env
-    command: sh -c "python manage.py migrate --noinput "
+    command: sh -c "python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py collectstatic --noinput"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles

@@ -15,7 +15,10 @@ RUN pip install --no-cache-dir -r requirements/development.txt
 
 COPY . .
 
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser \
+    && mkdir -p /app/staticfiles \
+    && chown -R appuser:appgroup /app/staticfiles
+
 USER appuser
 
 EXPOSE 8000

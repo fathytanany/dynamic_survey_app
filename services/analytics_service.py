@@ -18,14 +18,17 @@ HISTORICAL_TTL = 60 * 60      # 1 hour — historical reports
 
 
 def _analytics_key(survey_id) -> str:
+    """Return the Redis cache key for a survey's top-level analytics."""
     return f"survey:{survey_id}:analytics"
 
 
 def _field_analytics_key(survey_id) -> str:
+    """Return the Redis cache key for a survey's field-level analytics."""
     return f"survey:{survey_id}:analytics:fields"
 
 
 def _report_key(survey_id, report_date: str) -> str:
+    """Return the Redis cache key for a survey's historical report on a given date."""
     return f"survey:{survey_id}:report:{report_date}"
 
 
@@ -57,6 +60,7 @@ def get_survey_analytics(survey_id: str) -> dict:
 
 
 def _compute_survey_analytics(survey_id: str) -> dict:
+    """Query the DB to build the full analytics payload for a survey (no caching)."""
     base_qs = Response.objects.filter(survey_id=survey_id)
 
     totals = base_qs.aggregate(
@@ -135,6 +139,7 @@ def get_field_analytics(survey_id: str) -> list:
 
 
 def _compute_field_analytics(survey_id: str) -> list:
+    """Query the DB to build per-field answer distributions for a survey (no caching)."""
     fields = (
         Field.objects
         .filter(section__survey_id=survey_id)

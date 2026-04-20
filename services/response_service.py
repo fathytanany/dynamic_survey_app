@@ -219,6 +219,7 @@ def save_response(survey: Survey, data: dict, request) -> Response:
 # ---------------------------------------------------------------------------
 
 def get_response_by_session(session_token: str) -> Response | None:
+    """Retrieve a Response by its session token, with answers and fields pre-fetched; None if not found."""
     try:
         return (
             Response.objects
@@ -231,6 +232,7 @@ def get_response_by_session(session_token: str) -> Response | None:
 
 
 def get_user_responses(user):
+    """Return all responses submitted by *user*, newest first, with answers pre-fetched."""
     return (
         Response.objects
         .filter(respondent=user)
@@ -245,6 +247,7 @@ def get_user_responses(user):
 # ---------------------------------------------------------------------------
 
 def _get_client_ip(request) -> str:
+    """Extract the real client IP from the request, respecting X-Forwarded-For headers."""
     forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
     if forwarded:
         return forwarded.split(",")[0].strip()

@@ -6,10 +6,12 @@ SURVEY_DETAIL_TTL = 60 * 10  # 10 minutes
 
 
 def _cache_key(survey_id) -> str:
+    """Return the Redis cache key for a survey's detail data."""
     return f"survey:{survey_id}:detail"
 
 
 def invalidate_survey_cache(survey_id) -> None:
+    """Remove the cached detail entry for a survey, forcing the next read to hit the DB."""
     cache.delete(_cache_key(survey_id))
 
 
@@ -18,6 +20,7 @@ def invalidate_survey_cache(survey_id) -> None:
 # ---------------------------------------------------------------------------
 
 def create_survey(data: dict, user) -> Survey:
+    """Create and return a new Survey owned by *user*."""
     return Survey.objects.create(owner=user, **data)
 
 
@@ -30,6 +33,7 @@ def get_survey_list(user=None):
 
 
 def get_survey_by_id(survey_id: str) -> Survey | None:
+    """Fetch a single Survey by primary key; returns None if not found."""
     try:
         return Survey.objects.select_related("owner").get(pk=survey_id)
     except Survey.DoesNotExist:
@@ -61,6 +65,7 @@ def get_survey_detail_cached(survey_id: str) -> Survey | None:
 
 
 def update_survey(survey: Survey, data: dict) -> Survey:
+    """Apply *data* fields to *survey*, persist, and invalidate its cache entry."""
     for field, value in data.items():
         setattr(survey, field, value)
     survey.save()
@@ -69,12 +74,14 @@ def update_survey(survey: Survey, data: dict) -> Survey:
 
 
 def delete_survey(survey: Survey) -> None:
+    """Delete *survey* from the database and remove its cache entry."""
     survey_id = survey.pk
     survey.delete()
     invalidate_survey_cache(survey_id)
 
 
 def publish_survey(survey: Survey) -> Survey:
+    """Transition *survey* from DRAFT to PUBLISHED. Raises ValueError if not in draft state."""
     if survey.status != Survey.Status.DRAFT:
         raise ValueError("Only draft surveys can be published.")
     survey.status = Survey.Status.PUBLISHED
@@ -130,16 +137,19 @@ def clone_survey(survey: Survey, user) -> Survey:
 # ---------------------------------------------------------------------------
 
 def get_sections(survey: Survey):
+    """Return all sections belonging to *survey*, ordered by the DB default."""
     return survey.sections.all()
 
 
 def create_section(survey: Survey, data: dict) -> Section:
+    """Create a new Section inside *survey* and invalidate the survey cache."""
     section = Section.objects.create(survey=survey, **data)
     invalidate_survey_cache(survey.pk)
     return section
 
 
 def get_section_by_id(survey: Survey, section_id: str) -> Section | None:
+    """Return a Section scoped to *survey* by primary key; None if not found."""
     try:
         return survey.sections.get(pk=section_id)
     except Section.DoesNotExist:
@@ -147,6 +157,7 @@ def get_section_by_id(survey: Survey, section_id: str) -> Section | None:
 
 
 def update_section(section: Section, data: dict) -> Section:
+    """Apply *data* fields to *section*, persist, and invalidate the parent survey cache."""
     for field, value in data.items():
         setattr(section, field, value)
     section.save()
@@ -155,6 +166,7 @@ def update_section(section: Section, data: dict) -> Section:
 
 
 def delete_section(section: Section) -> None:
+    """Delete *section* and invalidate the parent survey cache."""
     survey_id = section.survey_id
     section.delete()
     invalidate_survey_cache(survey_id)
@@ -165,16 +177,19 @@ def delete_section(section: Section) -> None:
 # ---------------------------------------------------------------------------
 
 def get_fields(section: Section):
+    """Return all fields in *section*, prefetching related options."""
     return section.fields.prefetch_related("options").all()
 
 
 def create_field(section: Section, data: dict) -> Field:
+    """Create a new Field inside *section* and invalidate the parent survey cache."""
     field = Field.objects.create(section=section, **data)
     invalidate_survey_cache(section.survey_id)
     return field
 
 
 def get_field_by_id(section: Section, field_id: str) -> Field | None:
+    """Return a Field scoped to *section* by primary key; None if not found."""
     try:
         return section.fields.get(pk=field_id)
     except Field.DoesNotExist:
@@ -182,6 +197,7 @@ def get_field_by_id(section: Section, field_id: str) -> Field | None:
 
 
 def update_field(field: Field, data: dict) -> Field:
+    """Apply *data* attributes to *field*, persist, and invalidate the parent survey cache."""
     for attr, value in data.items():
         setattr(field, attr, value)
     field.save()
@@ -190,6 +206,7 @@ def update_field(field: Field, data: dict) -> Field:
 
 
 def delete_field(field: Field) -> None:
+    """Delete *field* and invalidate the parent survey cache."""
     survey_id = field.section.survey_id
     field.delete()
     invalidate_survey_cache(survey_id)
@@ -200,12 +217,14 @@ def delete_field(field: Field) -> None:
 # ---------------------------------------------------------------------------
 
 def create_condition(source_field: Field, data: dict) -> FieldCondition:
+    """Create a FieldCondition on *source_field* and invalidate the parent survey cache."""
     condition = FieldCondition.objects.create(source_field=source_field, **data)
     invalidate_survey_cache(source_field.section.survey_id)
     return condition
 
 
 def get_condition_by_id(condition_id: str) -> FieldCondition | None:
+    """Return a FieldCondition by primary key with its survey chain pre-selected; None if not found."""
     try:
         return FieldCondition.objects.select_related(
             "source_field__section__survey"
@@ -215,6 +234,7 @@ def get_condition_by_id(condition_id: str) -> FieldCondition | None:
 
 
 def delete_condition(condition: FieldCondition) -> None:
+    """Delete *condition* and invalidate the parent survey cache."""
     survey_id = condition.source_field.section.survey_id
     condition.delete()
     invalidate_survey_cache(survey_id)
