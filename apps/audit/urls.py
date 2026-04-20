@@ -1,3 +1,7 @@
 from django.urls import path
 
-urlpatterns = []
+from apps.audit.views import AuditLogListView
+
+urlpatterns = [
+    path("logs/", AuditLogListView.as_view(), name="audit-logs"),
+]
