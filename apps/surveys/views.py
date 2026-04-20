@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -27,11 +28,83 @@ def _is_owner_or_admin(user, survey):
 class SurveyListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="List all surveys",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": [
+                        {
+                            "id": "s1000000-0000-0000-0000-000000000001",
+                            "title": "Customer Satisfaction Q1",
+                            "description": "Quarterly customer feedback survey.",
+                            "status": "published",
+                            "requires_auth": False,
+                            "owner": "a1b2c3d4-0000-0000-0000-000000000001",
+                            "created_at": "2026-04-01T08:00:00Z",
+                            "updated_at": "2026-04-10T09:00:00Z",
+                        }
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request):
         surveys = survey_service.get_survey_list()
         serializer = SurveyListSerializer(surveys, many=True)
         return success_response(data=serializer.data)
 
+    @extend_schema(
+        summary="Create a new survey",
+        request=SurveyWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Basic survey",
+                value={
+                    "title": "Product Feedback",
+                    "description": "Collect feedback on our new product.",
+                    "requires_auth": False,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Auth-required survey",
+                value={
+                    "title": "Employee Engagement",
+                    "description": "Internal engagement survey — login required.",
+                    "requires_auth": True,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Survey created successfully.",
+                    "data": {
+                        "id": "s1000000-0000-0000-0000-000000000002",
+                        "title": "Product Feedback",
+                        "description": "Collect feedback on our new product.",
+                        "status": "draft",
+                        "requires_auth": False,
+                        "owner": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "sections": [],
+                        "created_at": "2026-04-21T10:00:00Z",
+                        "updated_at": "2026-04-21T10:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request):
         serializer = SurveyWriteSerializer(data=request.data)
         if not serializer.is_valid():
@@ -61,6 +134,50 @@ class SurveyDetailView(APIView):
             )
         return survey, None
 
+    @extend_schema(
+        summary="Get survey details with sections and fields",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": {
+                        "id": "s1000000-0000-0000-0000-000000000001",
+                        "title": "Customer Satisfaction Q1",
+                        "description": "Quarterly feedback survey.",
+                        "status": "published",
+                        "requires_auth": False,
+                        "owner": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "sections": [
+                            {
+                                "id": "sec10000-0000-0000-0000-000000000001",
+                                "title": "General",
+                                "order": 1,
+                                "fields": [
+                                    {
+                                        "id": "fld10000-0000-0000-0000-000000000001",
+                                        "label": "Overall satisfaction",
+                                        "field_type": "rating",
+                                        "required": True,
+                                        "order": 1,
+                                        "is_sensitive": False,
+                                        "options": [],
+                                        "conditions": [],
+                                    }
+                                ],
+                            }
+                        ],
+                        "created_at": "2026-04-01T08:00:00Z",
+                        "updated_at": "2026-04-10T09:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, survey_id):
         survey = survey_service.get_survey_detail_cached(survey_id)
         if survey is None:
@@ -71,6 +188,38 @@ class SurveyDetailView(APIView):
             )
         return success_response(data=SurveyDetailSerializer(survey).data)
 
+    @extend_schema(
+        summary="Update a survey (owner or admin)",
+        request=SurveyWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Update title and description",
+                value={"title": "Customer Satisfaction Q2", "description": "Updated quarterly survey."},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Survey updated successfully.",
+                    "data": {
+                        "id": "s1000000-0000-0000-0000-000000000001",
+                        "title": "Customer Satisfaction Q2",
+                        "description": "Updated quarterly survey.",
+                        "status": "draft",
+                        "requires_auth": False,
+                        "owner": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "sections": [],
+                        "created_at": "2026-04-01T08:00:00Z",
+                        "updated_at": "2026-04-21T11:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def put(self, request, survey_id):
         survey, err = self._get_survey_or_404(survey_id)
         if err:
@@ -94,6 +243,17 @@ class SurveyDetailView(APIView):
             message="Survey updated successfully.",
         )
 
+    @extend_schema(
+        summary="Delete a survey (owner or admin)",
+        examples=[
+            OpenApiExample(
+                "Success (204)",
+                value={"success": True, "message": "Survey deleted successfully.", "data": None, "errors": None},
+                response_only=True,
+                status_codes=["204"],
+            ),
+        ],
+    )
     def delete(self, request, survey_id):
         survey, err = self._get_survey_or_404(survey_id)
         if err:
@@ -114,6 +274,42 @@ class SurveyDetailView(APIView):
 class SurveyPublishView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Publish a survey (owner or admin)",
+        request=None,
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Survey published successfully.",
+                    "data": {
+                        "id": "s1000000-0000-0000-0000-000000000001",
+                        "title": "Customer Satisfaction Q1",
+                        "status": "published",
+                        "requires_auth": False,
+                        "sections": [],
+                        "created_at": "2026-04-01T08:00:00Z",
+                        "updated_at": "2026-04-21T12:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Validation error — no sections (400)",
+                value={
+                    "success": False,
+                    "message": "Publish failed.",
+                    "data": None,
+                    "errors": {"detail": "Survey must have at least one section with a field to be published."},
+                },
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -145,6 +341,33 @@ class SurveyPublishView(APIView):
 class SurveyCloneView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Clone an existing survey",
+        request=None,
+        examples=[
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Survey cloned successfully.",
+                    "data": {
+                        "id": "s1000000-0000-0000-0000-000000000099",
+                        "title": "Copy of Customer Satisfaction Q1",
+                        "description": "Quarterly customer feedback survey.",
+                        "status": "draft",
+                        "requires_auth": False,
+                        "owner": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "sections": [],
+                        "created_at": "2026-04-21T13:00:00Z",
+                        "updated_at": "2026-04-21T13:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -178,6 +401,29 @@ class SectionListView(APIView):
             )
         return survey, None
 
+    @extend_schema(
+        summary="List sections in a survey",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": [
+                        {
+                            "id": "sec10000-0000-0000-0000-000000000001",
+                            "title": "Demographics",
+                            "order": 1,
+                            "fields": [],
+                        }
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, survey_id):
         survey, err = self._get_survey_or_404(survey_id)
         if err:
@@ -186,6 +432,33 @@ class SectionListView(APIView):
         serializer = SectionSerializer(sections, many=True)
         return success_response(data=serializer.data)
 
+    @extend_schema(
+        summary="Create a section in a survey",
+        request=SectionWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Section creation",
+                value={"title": "Product Experience", "order": 2},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Section created successfully.",
+                    "data": {
+                        "id": "sec10000-0000-0000-0000-000000000002",
+                        "title": "Product Experience",
+                        "order": 2,
+                        "fields": [],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey, err = self._get_survey_or_404(survey_id)
         if err:
@@ -231,6 +504,33 @@ class SectionDetailView(APIView):
             )
         return survey, section, None
 
+    @extend_schema(
+        summary="Update a section (owner or admin)",
+        request=SectionWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Rename section",
+                value={"title": "Background Information", "order": 1},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Section updated successfully.",
+                    "data": {
+                        "id": "sec10000-0000-0000-0000-000000000001",
+                        "title": "Background Information",
+                        "order": 1,
+                        "fields": [],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def put(self, request, survey_id, section_id):
         survey, section, err = self._get_survey_and_section_or_404(survey_id, section_id)
         if err:
@@ -254,6 +554,17 @@ class SectionDetailView(APIView):
             message="Section updated successfully.",
         )
 
+    @extend_schema(
+        summary="Delete a section (owner or admin)",
+        examples=[
+            OpenApiExample(
+                "Success (204)",
+                value={"success": True, "message": "Section deleted successfully.", "data": None, "errors": None},
+                response_only=True,
+                status_codes=["204"],
+            ),
+        ],
+    )
     def delete(self, request, survey_id, section_id):
         survey, section, err = self._get_survey_and_section_or_404(survey_id, section_id)
         if err:
@@ -289,6 +600,37 @@ class FieldListView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+    @extend_schema(
+        summary="List fields in a section",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": [
+                        {
+                            "id": "fld10000-0000-0000-0000-000000000001",
+                            "label": "What is your age range?",
+                            "field_type": "single_choice",
+                            "required": True,
+                            "order": 1,
+                            "is_sensitive": False,
+                            "options": [
+                                {"id": "opt10000-0001", "value": "18-24", "order": 1},
+                                {"id": "opt10000-0002", "value": "25-34", "order": 2},
+                                {"id": "opt10000-0003", "value": "35-44", "order": 3},
+                            ],
+                            "conditions": [],
+                        }
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, section_id):
         section, err = self._get_section_or_404(section_id)
         if err:
@@ -297,6 +639,60 @@ class FieldListView(APIView):
         serializer = FieldSerializer(fields, many=True)
         return success_response(data=serializer.data)
 
+    @extend_schema(
+        summary="Create a field in a section",
+        request=FieldWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Text field",
+                value={
+                    "label": "Please describe your experience",
+                    "field_type": "text",
+                    "required": False,
+                    "order": 3,
+                    "is_sensitive": False,
+                    "options": [],
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Single-choice field with options",
+                value={
+                    "label": "How did you hear about us?",
+                    "field_type": "single_choice",
+                    "required": True,
+                    "order": 2,
+                    "is_sensitive": False,
+                    "options": [
+                        {"value": "Social media", "order": 1},
+                        {"value": "Friend referral", "order": 2},
+                        {"value": "Advertisement", "order": 3},
+                    ],
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Field created successfully.",
+                    "data": {
+                        "id": "fld10000-0000-0000-0000-000000000002",
+                        "label": "Please describe your experience",
+                        "field_type": "text",
+                        "required": False,
+                        "order": 3,
+                        "is_sensitive": False,
+                        "options": [],
+                        "conditions": [],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request, section_id):
         section, err = self._get_section_or_404(section_id)
         if err:
@@ -344,6 +740,37 @@ class FieldDetailView(APIView):
             )
         return section, field, None
 
+    @extend_schema(
+        summary="Update a field (owner or admin)",
+        request=FieldWriteSerializer,
+        examples=[
+            OpenApiExample(
+                "Make field required",
+                value={"required": True, "label": "Overall satisfaction (required)"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Field updated successfully.",
+                    "data": {
+                        "id": "fld10000-0000-0000-0000-000000000001",
+                        "label": "Overall satisfaction (required)",
+                        "field_type": "rating",
+                        "required": True,
+                        "order": 1,
+                        "is_sensitive": False,
+                        "options": [],
+                        "conditions": [],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def put(self, request, section_id, field_id):
         section, field, err = self._get_section_and_field_or_404(section_id, field_id)
         if err:
@@ -367,6 +794,17 @@ class FieldDetailView(APIView):
             message="Field updated successfully.",
         )
 
+    @extend_schema(
+        summary="Delete a field (owner or admin)",
+        examples=[
+            OpenApiExample(
+                "Success (204)",
+                value={"success": True, "message": "Field deleted successfully.", "data": None, "errors": None},
+                response_only=True,
+                status_codes=["204"],
+            ),
+        ],
+    )
     def delete(self, request, section_id, field_id):
         section, field, err = self._get_section_and_field_or_404(section_id, field_id)
         if err:
@@ -391,6 +829,48 @@ class FieldDetailView(APIView):
 class ConditionCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Add a display condition to a field",
+        request=FieldConditionSerializer,
+        examples=[
+            OpenApiExample(
+                "Show field when answer equals value",
+                value={
+                    "operator": "eq",
+                    "value": "Yes",
+                    "target_field": "fld10000-0000-0000-0000-000000000002",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Show section when answer is not empty",
+                value={
+                    "operator": "not_empty",
+                    "value": "",
+                    "target_section": "sec10000-0000-0000-0000-000000000002",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Condition created successfully.",
+                    "data": {
+                        "id": "cnd10000-0000-0000-0000-000000000001",
+                        "source_field": "fld10000-0000-0000-0000-000000000001",
+                        "operator": "eq",
+                        "value": "Yes",
+                        "target_field": "fld10000-0000-0000-0000-000000000002",
+                        "target_section": None,
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request, field_id):
         from apps.surveys.models import Field
         try:
@@ -427,6 +907,17 @@ class ConditionCreateView(APIView):
 class ConditionDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Delete a display condition",
+        examples=[
+            OpenApiExample(
+                "Success (204)",
+                value={"success": True, "message": "Condition deleted successfully.", "data": None, "errors": None},
+                response_only=True,
+                status_codes=["204"],
+            ),
+        ],
+    )
     def delete(self, request, condition_id):
         condition = survey_service.get_condition_by_id(condition_id)
         if condition is None:

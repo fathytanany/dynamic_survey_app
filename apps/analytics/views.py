@@ -1,4 +1,5 @@
 from django.core.cache import cache
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework.views import APIView
 
 from apps.analytics.serializers import (
@@ -24,6 +25,34 @@ class SurveyAnalyticsView(APIView):
 
     permission_classes = [IsDataViewer]
 
+    @extend_schema(
+        summary="Get aggregated analytics for a survey",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Survey analytics retrieved.",
+                    "data": {
+                        "survey_id": "s1000000-0000-0000-0000-000000000001",
+                        "total_responses": 120,
+                        "complete_responses": 98,
+                        "partial_responses": 22,
+                        "completion_rate": 81.67,
+                        "avg_completion_time_seconds": 245,
+                        "daily_submissions": [
+                            {"date": "2026-04-19", "count": 15},
+                            {"date": "2026-04-20", "count": 23},
+                            {"date": "2026-04-21", "count": 18},
+                        ],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -44,6 +73,47 @@ class FieldAnalyticsView(APIView):
 
     permission_classes = [IsDataViewer]
 
+    @extend_schema(
+        summary="Get per-field answer distribution for a survey",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Field analytics retrieved.",
+                    "data": [
+                        {
+                            "field_id": "fld10000-0000-0000-0000-000000000001",
+                            "label": "Overall satisfaction",
+                            "field_type": "rating",
+                            "response_count": 98,
+                            "answer_distribution": {
+                                "1": 3,
+                                "2": 8,
+                                "3": 22,
+                                "4": 41,
+                                "5": 24,
+                            },
+                        },
+                        {
+                            "field_id": "fld10000-0000-0000-0000-000000000002",
+                            "label": "How did you hear about us?",
+                            "field_type": "single_choice",
+                            "response_count": 95,
+                            "answer_distribution": {
+                                "Social media": 40,
+                                "Friend referral": 35,
+                                "Advertisement": 20,
+                            },
+                        },
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -65,6 +135,33 @@ class ExportResponsesView(APIView):
 
     permission_classes = [IsAnalyst]
 
+    @extend_schema(
+        summary="Export survey responses as JSON or CSV (async)",
+        request=ExportRequestSerializer,
+        examples=[
+            OpenApiExample(
+                "Export as CSV",
+                value={"format": "csv"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Export as JSON",
+                value={"format": "json"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Accepted (202)",
+                value={
+                    "success": True,
+                    "message": "Export task queued.",
+                    "data": {"task_id": "celery-task-uuid-0000-0001"},
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["202"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -98,6 +195,32 @@ class GenerateReportView(APIView):
 
     permission_classes = [IsAnalyst]
 
+    @extend_schema(
+        summary="Generate a full analytics report (async)",
+        examples=[
+            OpenApiExample(
+                "JSON report for a specific date",
+                value={"format": "json", "date": "2026-04-20"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "CSV report (no date filter)",
+                value={"format": "csv"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Accepted (202)",
+                value={
+                    "success": True,
+                    "message": "Report generation task queued.",
+                    "data": {"task_id": "celery-task-uuid-0000-0002"},
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["202"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -129,6 +252,59 @@ class TaskStatusView(APIView):
 
     permission_classes = [IsDataViewer]
 
+    @extend_schema(
+        summary="Poll the status of an async task (export or report)",
+        examples=[
+            OpenApiExample(
+                "Task pending",
+                value={
+                    "success": True,
+                    "message": "Task status retrieved.",
+                    "data": {
+                        "task_id": "celery-task-uuid-0000-0001",
+                        "status": "pending",
+                        "result": None,
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Task succeeded with JSON result",
+                value={
+                    "success": True,
+                    "message": "Task status retrieved.",
+                    "data": {
+                        "task_id": "celery-task-uuid-0000-0001",
+                        "status": "success",
+                        "result": {
+                            "rows": 98,
+                            "download_url": "/media/exports/survey-s1000000-export.csv",
+                        },
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Task failed",
+                value={
+                    "success": True,
+                    "message": "Task status retrieved.",
+                    "data": {
+                        "task_id": "celery-task-uuid-0000-0001",
+                        "status": "failure",
+                        "result": {"error": "Database connection timeout."},
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, task_id):
         meta_key = f"task:{task_id}:meta"
         meta = cache.get(meta_key)
