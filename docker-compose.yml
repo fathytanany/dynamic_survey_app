@@ -29,17 +29,29 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  init:
+    build: .
+    <<: *app-env
+    command: sh -c "python manage.py migrate --noinput "
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+    restart: "no"
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+
   web:
     build: .
     <<: *app-env
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --timeout 120
     volumes:
       - .:/app
@@ -52,6 +64,9 @@ services:
   worker:
     build: .
     <<: *app-env
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: celery -A config worker --loglevel=info --concurrency=4
     volumes:
       - .:/app
@@ -61,6 +76,9 @@ services:
   beat:
     build: .
     <<: *app-env
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - .:/app
@@ -70,6 +88,9 @@ services:
   flower:
     build: .
     <<: *app-env
+    depends_on:
+      init:
+        condition: service_completed_successfully
     command: celery -A config flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
     volumes:
       - .:/app
