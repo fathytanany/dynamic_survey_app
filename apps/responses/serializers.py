@@ -19,7 +19,7 @@ class ResponseSubmitSerializer(serializers.Serializer):
 
 
 class ResponseAnswerOutputSerializer(serializers.ModelSerializer):
-    field_id = serializers.UUIDField(source="field_id", read_only=True)
+    field_id = serializers.UUIDField(read_only=True)
     value = serializers.SerializerMethodField()
 
     class Meta:
@@ -36,8 +36,8 @@ class ResponseAnswerOutputSerializer(serializers.ModelSerializer):
 
 
 class ResponseOutputSerializer(serializers.ModelSerializer):
-    survey_id = serializers.UUIDField(source="survey_id", read_only=True)
-    respondent_id = serializers.UUIDField(source="respondent_id", read_only=True)
+    survey_id = serializers.UUIDField(read_only=True)
+    respondent_id = serializers.UUIDField(read_only=True)
     answers = ResponseAnswerOutputSerializer(many=True, read_only=True)
 
     class Meta:

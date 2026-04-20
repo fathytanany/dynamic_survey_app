@@ -2,7 +2,7 @@ import json
 from datetime import date, timedelta
 
 from django.core.cache import cache
-from django.db.models import Avg, Count, ExpressionWrapper, F, FloatField, Q
+from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, FloatField, Q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
@@ -76,7 +76,7 @@ def _compute_survey_analytics(survey_id: str) -> dict:
         .annotate(
             duration=ExpressionWrapper(
                 F("completed_at") - F("started_at"),
-                output_field=FloatField(),
+                output_field=DurationField(),
             )
         )
         .aggregate(avg=Avg("duration"))["avg"]
