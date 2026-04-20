@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.responses.models import Response, ResponseAnswer
 from apps.surveys.models import Field, FieldCondition, Survey
-from services import encryption_service
+from services import analytics_service, encryption_service
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +207,10 @@ def save_response(survey: Survey, data: dict, request) -> Response:
             ))
 
     ResponseAnswer.objects.bulk_create(answer_objs)
+
+    # Invalidate analytics cache so next read reflects this submission
+    analytics_service.invalidate_analytics_cache(str(survey.pk))
+
     return response
 
 
