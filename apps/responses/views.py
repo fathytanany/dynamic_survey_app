@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
@@ -20,6 +21,86 @@ class SubmitResponseView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Submit or save a partial response to a survey",
+        request=ResponseSubmitSerializer,
+        examples=[
+            OpenApiExample(
+                "Complete submission",
+                value={
+                    "answers": [
+                        {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "4"},
+                        {"field_id": "fld10000-0000-0000-0000-000000000002", "value": "Great product!"},
+                    ],
+                    "status": "complete",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Partial save (resume later)",
+                value={
+                    "answers": [
+                        {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "5"},
+                    ],
+                    "status": "partial",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Resume existing partial session",
+                value={
+                    "session_token": "abc123-session-token",
+                    "answers": [
+                        {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "5"},
+                        {"field_id": "fld10000-0000-0000-0000-000000000002", "value": "Love it!"},
+                    ],
+                    "status": "complete",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "Response saved.",
+                    "data": {
+                        "id": "res10000-0000-0000-0000-000000000001",
+                        "survey": "s1000000-0000-0000-0000-000000000001",
+                        "status": "complete",
+                        "session_token": None,
+                        "submitted_at": "2026-04-21T14:00:00Z",
+                        "answers": [
+                            {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "4"},
+                            {"field_id": "fld10000-0000-0000-0000-000000000002", "value": "Great product!"},
+                        ],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+            OpenApiExample(
+                "Partial saved (201)",
+                value={
+                    "success": True,
+                    "message": "Response saved.",
+                    "data": {
+                        "id": "res10000-0000-0000-0000-000000000002",
+                        "survey": "s1000000-0000-0000-0000-000000000001",
+                        "status": "partial",
+                        "session_token": "abc123-session-token",
+                        "submitted_at": None,
+                        "answers": [
+                            {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "5"},
+                        ],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request, survey_id):
         survey = survey_service.get_survey_by_id(survey_id)
         if survey is None:
@@ -62,6 +143,42 @@ class ResumeResponseView(APIView):
 
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Resume a partial survey response by session token",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": {
+                        "id": "res10000-0000-0000-0000-000000000002",
+                        "survey": "s1000000-0000-0000-0000-000000000001",
+                        "status": "partial",
+                        "session_token": "abc123-session-token",
+                        "submitted_at": None,
+                        "answers": [
+                            {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "5"},
+                        ],
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Session already complete (400)",
+                value={
+                    "success": False,
+                    "message": "This session is already complete.",
+                    "data": None,
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["400"],
+            ),
+        ],
+    )
     def get(self, request, session_token):
         response = response_service.get_response_by_session(session_token)
         if response is None:
@@ -82,6 +199,33 @@ class MyResponsesView(APIView):
 
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="List all responses submitted by the current user",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": [
+                        {
+                            "id": "res10000-0000-0000-0000-000000000001",
+                            "survey": "s1000000-0000-0000-0000-000000000001",
+                            "status": "complete",
+                            "session_token": None,
+                            "submitted_at": "2026-04-21T14:00:00Z",
+                            "answers": [
+                                {"field_id": "fld10000-0000-0000-0000-000000000001", "value": "4"},
+                            ],
+                        }
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request):
         responses = response_service.get_user_responses(request.user)
         return success_response(data=ResponseOutputSerializer(responses, many=True).data)

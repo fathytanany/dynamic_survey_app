@@ -1,5 +1,6 @@
 from django.utils.decorators import method_decorator
 from django_ratelimit.decorators import ratelimit
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -21,6 +22,61 @@ from services import user_service
 class RegisterView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Register a new user",
+        request=RegisterSerializer,
+        examples=[
+            OpenApiExample(
+                "Viewer registration",
+                value={
+                    "email": "jane.doe@example.com",
+                    "password": "Str0ng!Pass",
+                    "password_confirm": "Str0ng!Pass",
+                    "first_name": "Jane",
+                    "last_name": "Doe",
+                    "role": "data_viewer",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Admin registration",
+                value={
+                    "email": "admin@example.com",
+                    "password": "Adm!nPass99",
+                    "password_confirm": "Adm!nPass99",
+                    "first_name": "Admin",
+                    "last_name": "User",
+                    "role": "admin",
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (201)",
+                value={
+                    "success": True,
+                    "message": "User registered successfully.",
+                    "data": {
+                        "user": {
+                            "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                            "email": "jane.doe@example.com",
+                            "first_name": "Jane",
+                            "last_name": "Doe",
+                            "role": "data_viewer",
+                            "created_at": "2026-04-21T10:00:00Z",
+                            "updated_at": "2026-04-21T10:00:00Z",
+                        },
+                        "tokens": {
+                            "access": "<jwt-access-token>",
+                            "refresh": "<jwt-refresh-token>",
+                        },
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["201"],
+            ),
+        ],
+    )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         if not serializer.is_valid():
@@ -44,6 +100,53 @@ class RegisterView(APIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Authenticate and obtain JWT tokens",
+        request=LoginSerializer,
+        examples=[
+            OpenApiExample(
+                "Login request",
+                value={"email": "jane.doe@example.com", "password": "Str0ng!Pass"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Login successful.",
+                    "data": {
+                        "user": {
+                            "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                            "email": "jane.doe@example.com",
+                            "first_name": "Jane",
+                            "last_name": "Doe",
+                            "role": "data_viewer",
+                            "created_at": "2026-04-21T10:00:00Z",
+                            "updated_at": "2026-04-21T10:00:00Z",
+                        },
+                        "tokens": {
+                            "access": "<jwt-access-token>",
+                            "refresh": "<jwt-refresh-token>",
+                        },
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+            OpenApiExample(
+                "Invalid credentials (401)",
+                value={
+                    "success": False,
+                    "message": "Authentication failed.",
+                    "data": None,
+                    "errors": {"detail": "Invalid email or password."},
+                },
+                response_only=True,
+                status_codes=["401"],
+            ),
+        ],
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
@@ -74,6 +177,28 @@ class LoginView(APIView):
 class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary="Refresh JWT access token",
+        request=TokenRefreshSerializer,
+        examples=[
+            OpenApiExample(
+                "Refresh request",
+                value={"refresh": "<jwt-refresh-token>"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Token refreshed.",
+                    "data": {"access": "<new-jwt-access-token>"},
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def post(self, request):
         serializer = TokenRefreshSerializer(data=request.data)
         try:
@@ -90,10 +215,64 @@ class RefreshTokenView(APIView):
 class ProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        summary="Get current user profile",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": {
+                        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "email": "jane.doe@example.com",
+                        "first_name": "Jane",
+                        "last_name": "Doe",
+                        "role": "data_viewer",
+                        "created_at": "2026-04-21T10:00:00Z",
+                        "updated_at": "2026-04-21T10:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request):
         serializer = UserProfileSerializer(request.user)
         return success_response(data=serializer.data)
 
+    @extend_schema(
+        summary="Partially update current user profile",
+        request=UserProfileSerializer,
+        examples=[
+            OpenApiExample(
+                "Update name",
+                value={"first_name": "Janet", "last_name": "Smith"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "Profile updated successfully.",
+                    "data": {
+                        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "email": "jane.doe@example.com",
+                        "first_name": "Janet",
+                        "last_name": "Smith",
+                        "role": "data_viewer",
+                        "created_at": "2026-04-21T10:00:00Z",
+                        "updated_at": "2026-04-21T11:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def patch(self, request):
         serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
         if not serializer.is_valid():
@@ -114,6 +293,33 @@ class ProfileView(APIView):
 class UserListView(APIView):
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        summary="List all users (admin only)",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": [
+                        {
+                            "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                            "email": "jane.doe@example.com",
+                            "first_name": "Jane",
+                            "last_name": "Doe",
+                            "role": "data_viewer",
+                            "is_active": True,
+                            "created_at": "2026-04-21T10:00:00Z",
+                            "updated_at": "2026-04-21T10:00:00Z",
+                        }
+                    ],
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request):
         users = user_service.get_user_list()
         serializer = UserManagementSerializer(users, many=True)
@@ -133,12 +339,73 @@ class UserDetailView(APIView):
             )
         return user, None
 
+    @extend_schema(
+        summary="Get a specific user (admin only)",
+        examples=[
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "",
+                    "data": {
+                        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "email": "jane.doe@example.com",
+                        "first_name": "Jane",
+                        "last_name": "Doe",
+                        "role": "data_viewer",
+                        "is_active": True,
+                        "created_at": "2026-04-21T10:00:00Z",
+                        "updated_at": "2026-04-21T10:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def get(self, request, user_id):
         user, err = self._get_user_or_404(user_id)
         if err:
             return err
         return success_response(data=UserManagementSerializer(user).data)
 
+    @extend_schema(
+        summary="Update a user's role or status (admin only)",
+        request=UserManagementSerializer,
+        examples=[
+            OpenApiExample(
+                "Deactivate user",
+                value={"is_active": False},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Change role",
+                value={"role": "analyst"},
+                request_only=True,
+            ),
+            OpenApiExample(
+                "Success (200)",
+                value={
+                    "success": True,
+                    "message": "User updated successfully.",
+                    "data": {
+                        "id": "a1b2c3d4-0000-0000-0000-000000000001",
+                        "email": "jane.doe@example.com",
+                        "first_name": "Jane",
+                        "last_name": "Doe",
+                        "role": "analyst",
+                        "is_active": True,
+                        "created_at": "2026-04-21T10:00:00Z",
+                        "updated_at": "2026-04-21T12:00:00Z",
+                    },
+                    "errors": None,
+                },
+                response_only=True,
+                status_codes=["200"],
+            ),
+        ],
+    )
     def patch(self, request, user_id):
         user, err = self._get_user_or_404(user_id)
         if err:
@@ -156,6 +423,17 @@ class UserDetailView(APIView):
             message="User updated successfully.",
         )
 
+    @extend_schema(
+        summary="Delete a user (admin only)",
+        examples=[
+            OpenApiExample(
+                "Success (204)",
+                value={"success": True, "message": "User deleted successfully.", "data": None, "errors": None},
+                response_only=True,
+                status_codes=["204"],
+            ),
+        ],
+    )
     def delete(self, request, user_id):
         user, err = self._get_user_or_404(user_id)
         if err:
